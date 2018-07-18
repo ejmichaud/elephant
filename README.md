@@ -24,6 +24,13 @@ Spaced repetition memory systems are great, but popular solutions like [Anki](ht
 
 An elephant never forgets!
 
+## Installation
+```
+$ git clone https://github.com/ejmichaud/elephant.git
+$ cd elephant
+$ pip install .
+```
+
 ## Tutorial
 ```
 Usage: elephant [OPTIONS] COMMAND [ARGS]...
