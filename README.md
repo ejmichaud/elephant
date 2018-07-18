@@ -1,22 +1,22 @@
 # elephant
-A spaced repetition memory system for the command line!
 
 ```
- __                 
-'. \                
- '- \               
+ __
+'. \
+ '- \
   / /_         .---.
- / | \\,.\/--.//    )
- |  \//        )/  / 
-  \  ' ^ ^    /    )____.----..  6
-   '.____.    .___/            \._) 
-      .\/.                      )
-       '\                       /
-       _/ \/    ).        )    (
-      /#  .!    |        /\    /
-      \  C// #  /'-----''/ #  / 
+ / | \\,.\/--.//    )                       +-------------------+
+ |  \//        )/  /                        |                   |
+  \  ' ^ ^    /    )____.----..  6          |  A spaced         |
+   '.____.    .___/            \._)         |  repetition       |
+      .\/.                      )           |  memory system    |
+       '\                       /           |  for the command  |
+       _/ \/    ).        )    (            |  line!            |
+      /#  .!    |        /\    /            |                   |
+      \  C// #  /'---+-''/ #  /             +-------------------+
    .   'C/ |    |    |   |    |mrf  ,
    \), .. .'OOO-'. ..'OOO'OOO-'. ..\(,
+
 ```
 
 ## Motivation
@@ -124,4 +124,4 @@ And the process continues until you go through all the cards that the spaced rep
 | 10 	| 2 years						  |
 | 11 	| 4 years						  |
 
-*If you find bugs, post an 'issue' to the repository, or email me at eric.michaud99 [at] gmail [dot] com
+*If you find bugs, post an 'issue' to the repository, or email me at eric.michaud99 [at]gmail[dot]com*
