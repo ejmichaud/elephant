@@ -4,7 +4,8 @@ import time
 import pickle
 import click
 
-DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'db.p')
+CARDS_DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'cards.p')
+METADATA_DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'metadata.p')
 
 LEVELS_TO_INTERVALS = {
     0: 3600 * 0,                    # 0 hrs
@@ -35,6 +36,20 @@ def write_cards(cards, path):
     with open(path, 'wb') as f:
         pickle.dump(cards, f)
 
+def get_next_id(path):
+    """Gets the next id from the database at the given path and increments the value in this database"""
+    try:
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+            id = data['next_id']
+            data['next_id'] += 1
+    except:
+        id, data = 0, {}
+        data['next_id'] = id + 1
+    with open(path, 'wb') as f:
+        pickle.dump(data, f)
+    return id
+
 @click.group()
 def main():
     """The elephant spaced repetition memory application"""
@@ -44,16 +59,11 @@ def main():
 @click.argument("question")
 @click.argument("answer")
 def add(question, answer):
-    """Create a card
-    
-    Examples:
-        $ elephant add "A great question?" "A great answer."
-        $ elephant add 'Ultimate answer?' 42
-    """
-    cards = read_cards(DATABASE)
+    """Create a card"""
+    cards = read_cards(CARDS_DATABASE)
     cards.append(
         {   
-            'id': len(cards), 
+            'id': get_next_id(METADATA_DATABASE), 
             'question': question,
             'answer': answer,
             'time_created': time.time(),
@@ -61,36 +71,55 @@ def add(question, answer):
             'last_reviewed': time.time(),
         }
     )
-    write_cards(cards, DATABASE)
+    write_cards(cards, CARDS_DATABASE)
 
 @main.command()
 @click.option("--limit", default=10,
     help="The maximum number of cards to list")
 def ls(limit):
     """List some cards"""
-    cards = read_cards(DATABASE)
+    cards = read_cards(CARDS_DATABASE)
     if cards:
         for card in cards[:limit]:
-            click.echo("{}. {} --> {}".format(card['id'], card['question'], card['answer']))
+            click.echo("#{}: {} --> {}".format(card['id'], card['question'], card['answer']))
+    else:
+        click.echo("No cards available")
+
+@main.command()
+@click.argument("ids", nargs=-1, type=int)
+def rm(ids):
+    """Remove cards with listed ids"""
+    number_cards_removed = 0
+    cards = read_cards(CARDS_DATABASE)
+    if cards:
+        i = 0
+        while i < len(cards):
+            if cards[i]['id'] in ids:
+                cards.pop(i)
+                number_cards_removed += 1
+            else:
+                i += 1
+        write_cards(cards, CARDS_DATABASE)
+        click.echo("Removed {} cards".format(number_cards_removed))
     else:
         click.echo("No cards available")
 
 @main.command()
 @click.option("--limit", default=15,
     help="The maximum number of cards to list")
-@click.argument("phrase")
-def search(phrase, limit):
-    """Print cards containing phrase (case sensitive)"""
+@click.argument("phrases", nargs=-1)
+def search(phrases, limit):
+    """Print cards whose question or answer combined contain all inputed phrases"""
     got_hits = False
-    cards = read_cards(DATABASE)
+    cards = read_cards(CARDS_DATABASE)
     if cards:
         for card in cards[:limit]:
             if limit <= 0:
                 break
-            if phrase in card['question'] or phrase in card['answer']:
+            if all([(phrase in card['question'] or phrase in card['answer']) for phrase in phrases]):
                 got_hits = True
                 limit -= 1
-                click.echo("{}. {} --> {}".format(card['id'], card['question'], card['answer']))
+                click.echo("#{}: {} --> {}".format(card['id'], card['question'], card['answer']))
     else:
         click.echo("No cards available")
         sys.exit()
@@ -98,15 +127,17 @@ def search(phrase, limit):
         click.echo("Found no matches")
 
 @main.command()
-def quiz():
-    """Review cards you are at risk of forgetting"""
-    cards = read_cards(DATABASE)
+@click.argument("phrases", nargs=-1)
+def quiz(phrases):
+    """Review cards that you are at risk of forgetting and that contain PHRASES if given"""
+    cards = read_cards(CARDS_DATABASE)
     if cards:
         current_time = time.time()
         todays_cards = [card for card in cards \
-            if (card['last_reviewed']+LEVELS_TO_INTERVALS[card['level']]) < current_time]
+            if ((card['last_reviewed']+LEVELS_TO_INTERVALS[card['level']]) < current_time) \
+            and all([(phrase in card['question'] or phrase in card['answer']) for phrase in phrases])]
         if not todays_cards:
-            click.echo("No cards require reviewing now")
+            click.echo("Cards don't require reviewing now")
             sys.exit()
         click.echo("Starting review session... Spam Ctrl-C to stop")
         try:
@@ -119,7 +150,7 @@ def quiz():
                     card['level'] += (1 if card['level'] < 11 else 0)
                     card['last_reviewed'] = time.time()
                 elif mem_status in ['meh', 'MEH', 'm', 'M']:
-                    card['level'] = int(card['level'] / 1.5)
+                    card['level'] = int(card['level'] / 1.99)
                     card['last_reviewed'] = time.time()
                 elif mem_status in ['no', 'NO', 'n', 'N']:
                     card['level'] = 0
@@ -128,26 +159,8 @@ def quiz():
                     click.echo("Unrecognized response. Made no change to card state")
         except:
             click.echo("Ending session...")
-        write_cards(cards, DATABASE)
+        write_cards(cards, CARDS_DATABASE)
     else:
         click.echo("No cards available")
 
-@main.command()
-@click.argument("ids", nargs=-1, type=int)
-def rm(ids):
-    """Remove cards with listed ids"""
-    number_cards_removed = 0
-    cards = read_cards(DATABASE)
-    if cards:
-        i = 0
-        while i < len(cards):
-            if cards[i]['id'] in ids:
-                cards.pop(i)
-                number_cards_removed += 1
-            else:
-                i += 1
-        write_cards(cards, DATABASE)
-        click.echo("Removed {} cards".format(number_cards_removed))
-    else:
-        click.echo("No cards available")
     
