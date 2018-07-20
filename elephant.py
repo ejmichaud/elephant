@@ -49,7 +49,7 @@ def get_next_id(path):
     with open(path, 'wb') as f:
         pickle.dump(data, f)
     return id
-
+    
 @click.group()
 def main():
     """The elephant spaced repetition memory application"""
@@ -142,9 +142,9 @@ def quiz(phrases):
         click.echo("Starting review session... Spam Ctrl-C to stop")
         try:
             for card in todays_cards:
-                click.echo("\nQUESTION : {} \n".format(card['question']))
+                print_card("QUESTION", card['question'])
                 click.pause(info="(Press any key to show answer)")
-                click.echo("\nANSWER : {} \n".format(card['answer']))
+                print_card("ANSWER", card['answer'])
                 mem_status = click.prompt("Did you remember it? yes/meh/no", default='yes')
                 if mem_status in ['yes', 'YES', 'y', 'Y']:
                     card['level'] += (1 if card['level'] < 11 else 0)
@@ -157,10 +157,43 @@ def quiz(phrases):
                     card['last_reviewed'] = time.time()
                 else:
                     click.echo("Unrecognized response. Made no change to card state")
-        except:
+        except KeyboardInterrupt:
             click.echo("Ending session...")
         write_cards(cards, CARDS_DATABASE)
     else:
         click.echo("No cards available")
 
-    
+def print_card(title, text, width=40):
+    """Prints the text in a box with a title on top
+
+    TODO:
+        -Center justify the text, as opposed to left justify?
+    """
+    assert len(title) < (width - 4), "Title is too long for card"
+    assert width % 2 == 0, "Width must be divisible by two"
+    def split_text_into_lines(text):
+        words = text.split(' ')
+        assert all([len(word) < width for word in words])
+        lines = []
+        line = ""
+        i = 0
+        while i < len(words):
+            if len(line) + len(words[i]) + 1 <= width - 4:
+                line += words[i] + " "
+                i += 1
+            else:
+                lines.append(line)
+                line = ""
+        lines.append(line)
+        return lines
+    lines = split_text_into_lines(text)
+
+    click.echo("+" + ("-" * (width - 2)) + "+")
+    title = title if len(title) % 2 == 0 else title + " "
+    title_margin = " " * ((width - 4 - len(title)) // 2)
+    click.echo("| " + title_margin + title + title_margin + " |")
+    click.echo("| " + " " * (width - 4) + " |")
+
+    for line in lines:
+        click.echo("| " + line + (' ' * (width - len(line) - 4)) + " |")
+    click.echo("+" + ("-" * (width - 2)) + "+")
