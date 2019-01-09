@@ -1,11 +1,12 @@
 import os
 import sys
 import time
-import pickle
-import click
 
-CARDS_DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'cards.p')
-METADATA_DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'metadata.p')
+import click
+import sqlite3
+
+DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data.db')
+# METADATA_DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'metadata.p')
 
 LEVELS_TO_INTERVALS = {
     0: 3600 * 0,                    # 0 hrs
@@ -22,33 +23,63 @@ LEVELS_TO_INTERVALS = {
     11: 3600 * 24 * 7 * 4 * 12 * 4, # 4 years
 }
 
-def read_cards(path):
-    """Loads card list from database at 'path'"""
-    try:
-        with open(path, 'rb') as f:
-            cards = pickle.load(f)
-    except:
-        cards = []
-    return cards
+class Card:
+    """A 'card'.
 
-def write_cards(cards, path):
-    """Writes card list to database at 'path', overriding previous contents"""
-    with open(path, 'wb') as f:
-        pickle.dump(cards, f)
+    This app allows users to make two kinds of records: 'cards' & 'notes'. 
+    This class represents a 'card', which has a question and an answer, and
+    contains metadata for the spaced-repetition system.
+    
+    Attributes:
+        id (int): A unique numeric id.
+        question (str): The 'question' on the card.
+        answer (str): The 'answer' on the card.
+        level (int): A spaced-repetition score (see LEVELS_TO_INTERVALS).
+        time_created (float): The UTC UNIX time of the card's creation.
+        last_reviewed (float): The UTC UNIX time when the card was last quized.
+    
+    """
 
-def get_next_id(path):
-    """Gets the next id from the database at the given path and increments the value in this database"""
-    try:
-        with open(path, 'rb') as f:
-            data = pickle.load(f)
-            id = data['next_id']
-            data['next_id'] += 1
-    except:
-        id, data = 0, {}
-        data['next_id'] = id + 1
-    with open(path, 'wb') as f:
-        pickle.dump(data, f)
-    return id
+    def __init__ (self, id, question, answer, level, 
+                        time_created, last_reviewed):
+        """The initializer for the class."""
+        self.id = id
+        self.question = question
+        self.answer = answer
+        self.level = level
+        self.time_created = time_created
+        self.last_reviewed = last_reviewed
+
+    @classmethod
+    def fromtuple(self, data):
+        return self(data[0], data[1], data[2], data[3], data[4], data[5])
+
+def read_all_cards():
+    """Loads card list from global variable DATABASE"""
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute('SELECT * FROM cards')
+    rows = c.fetchall()
+    conn.close()
+    return [Card.fromtuple(row) for row in rows]
+
+# def write_cards(cards, path):
+#     """Writes card list to database at 'path', overriding previous contents"""
+#     with open(path, 'wb') as f:
+#         pickle.dump(cards, f)
+
+def get_next_id():
+    """Gets the next id from the DATABASE and increments its value
+    in the database. """
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute('SELECT value FROM metadata WHERE key="next_id"')
+    next_id = int(c.fetchone()[0])
+    tup = (str(next_id + 1), )
+    c.execute('UPDATE metadata SET value=? WHERE key="next_id"', tup)
+    conn.commit()
+    conn.close()
+    return next_id
     
 @click.group()
 def main():
@@ -60,28 +91,37 @@ def main():
 @click.argument("answer")
 def add(question, answer):
     """Create a card"""
-    cards = read_cards(CARDS_DATABASE)
-    cards.append(
-        {   
-            'id': get_next_id(METADATA_DATABASE), 
-            'question': question,
-            'answer': answer,
-            'time_created': time.time(),
-            'level': 0,
-            'last_reviewed': time.time(),
-        }
-    )
-    write_cards(cards, CARDS_DATABASE)
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    new_row = (
+            get_next_id(), 
+            question,
+            answer,
+            0,
+            time.time(),
+            time.time()
+        )
+    c.execute('INSERT INTO cards VALUES (?,?,?,?,?,?)', new_row)
+    conn.commit()
+    conn.close()
 
 @main.command()
 @click.option("--limit", default=10,
     help="The maximum number of cards to list")
 def ls(limit):
     """List some cards"""
-    cards = read_cards(CARDS_DATABASE)
+    if limit == 0:
+        click.echo("Showing 0 cards ;)")
+        return
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    c.execute('SELECT * FROM cards LIMIT ?', (limit,))
+    cards = [Card.fromtuple(row) for row in c.fetchall()]
+    conn.close()
     if cards:
-        for card in cards[:limit]:
-            click.echo("#{}: {} --> {}".format(card['id'], card['question'], card['answer']))
+        for card in cards:
+            click.echo("#{}: {} --> {}".format(card.id, 
+                    card.question, card.answer))
     else:
         click.echo("No cards available")
 
@@ -90,19 +130,26 @@ def ls(limit):
 def rm(ids):
     """Remove cards with listed ids"""
     number_cards_removed = 0
-    cards = read_cards(CARDS_DATABASE)
-    if cards:
-        i = 0
-        while i < len(cards):
-            if cards[i]['id'] in ids:
-                cards.pop(i)
-                number_cards_removed += 1
-            else:
-                i += 1
-        write_cards(cards, CARDS_DATABASE)
-        click.echo("Removed {} cards".format(number_cards_removed))
+    removed_cards = []
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    for identifier in ids:
+        c.execute('SELECT * FROM cards WHERE id=?', (identifier,))
+        num_cards_found = len(c.fetchall())
+        if num_cards_found == 1:
+            c.execute('DELETE FROM cards WHERE id=?', (identifier,))
+            removed_cards.append(int(identifier))
+            number_cards_removed += 1
+        elif num_cards_found >= 2:
+            raise Exception("Found {} cards with id {}. \
+                Should be either 0 or 1".format(number_cards_found, 
+                    identifier))
+    conn.commit()
+    conn.close()
+    if number_cards_removed > 0:
+        click.echo("Removed cards: {}".format(removed_cards))
     else:
-        click.echo("No cards available")
+        click.echo("Removed no cards")
 
 @main.command()
 @click.option("--limit", default=15,
@@ -110,56 +157,72 @@ def rm(ids):
 @click.argument("phrases", nargs=-1)
 def search(phrases, limit):
     """Print cards whose question or answer combined contain all inputed phrases"""
-    got_hits = False
-    cards = read_cards(CARDS_DATABASE)
-    if cards:
-        for card in cards[:limit]:
-            if limit <= 0:
-                break
-            if all([(phrase in card['question'] or phrase in card['answer']) for phrase in phrases]):
-                got_hits = True
-                limit -= 1
-                click.echo("#{}: {} --> {}".format(card['id'], card['question'], card['answer']))
-    else:
-        click.echo("No cards available")
-        sys.exit()
-    if not got_hits:
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    query = 'SELECT * FROM cards WHERE '
+    for phrase in phrases:
+        query += '(instr("question", "{}") > 0 OR instr("answer", "{}") > 0)'.format(
+            phrase, phrase)
+        query += ' AND '
+    query = query[:-4]
+    query += ' LIMIT {}'.format(limit)
+    c.execute(query)
+    cards = [Card.fromtuple(row) for row in c.fetchall()]
+    conn.close()
+    for card in cards:
+        click.echo("#{}: {} --> {}".format(card.id, card.question, card.answer))
+    if not cards:
         click.echo("Found no matches")
 
 @main.command()
 @click.argument("phrases", nargs=-1)
 def quiz(phrases):
     """Review cards that you are at risk of forgetting and that contain PHRASES if given"""
-    cards = read_cards(CARDS_DATABASE)
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
+    query = 'SELECT * FROM cards WHERE '
+    for phrase in phrases:
+        query += '(instr("question", "{}") > 0 OR instr("answer", "{}") > 0)'.format(
+            phrase, phrase)
+        query += ' AND '
+    query = query[:-4]
+    c.execute(query)
+    cards = [Card.fromtuple(row) for row in c.fetchall()]
     if cards:
         current_time = time.time()
         todays_cards = [card for card in cards \
-            if ((card['last_reviewed']+LEVELS_TO_INTERVALS[card['level']]) < current_time) \
-            and all([(phrase in card['question'] or phrase in card['answer']) for phrase in phrases])]
+            if ((card.last_reviewed+LEVELS_TO_INTERVALS[card.level]) < current_time)]
         if not todays_cards:
-            click.echo("Cards don't require reviewing now")
+            click.echo("No cards require revieiwng now.")
             sys.exit()
         click.echo("Starting review session... Spam Ctrl-C to stop")
         try:
             for card in todays_cards:
-                print_card("QUESTION", card['question'])
+                print_card("QUESTION", card.question)
                 click.pause(info="(Press any key to show answer)")
-                print_card("ANSWER", card['answer'])
+                print_card("ANSWER", card.answer)
                 mem_status = click.prompt("Did you remember it? yes/meh/no", default='yes')
                 if mem_status in ['yes', 'YES', 'y', 'Y']:
-                    card['level'] += (1 if card['level'] < 11 else 0)
-                    card['last_reviewed'] = time.time()
+                    tup = (card.level + (1 if card.level < 11 else 0), card.id)
+                    c.execute('UPDATE cards SET level=? WHERE id=?', tup)
+                    tup = (time.time(), card.id)
+                    c.execute('UPDATE cards SET last_reviewed=? WHERE id=?', tup)
                 elif mem_status in ['meh', 'MEH', 'm', 'M']:
-                    card['level'] = int(card['level'] / 1.99)
-                    card['last_reviewed'] = time.time()
+                    tup = (card.level / 1.99, card.id)
+                    c.execute('UPDATE cards SET level=? WHERE id=?', tup)
+                    tup = (time.time(), card.id)
+                    c.execute('UPDATE cards SET last_reviewed=? WHERE id=?', tup)
                 elif mem_status in ['no', 'NO', 'n', 'N']:
-                    card['level'] = 0
-                    card['last_reviewed'] = time.time()
+                    tup = (0, card.id)
+                    c.execute('UPDATE cards SET level=? WHERE id=?', tup)
+                    tup = (time.time(), card.id)
+                    c.execute('UPDATE cards SET last_reviewed=? WHERE id=?', tup)
                 else:
                     click.echo("Unrecognized response. Made no change to card state")
         except KeyboardInterrupt:
             click.echo("Ending session...")
-        write_cards(cards, CARDS_DATABASE)
+        conn.commit()
+        conn.close()
     else:
         click.echo("No cards available")
 

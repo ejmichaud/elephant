@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
 	name='elephant',
-	version=1.2,
+	version=1.3,
 	install_requires=[
 		'Click'
 	],
