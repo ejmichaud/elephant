@@ -169,7 +169,9 @@ def print_card(title, text, width=40):
     TODO:
         -Center justify the text, as opposed to left justify?
     """
-    assert len(title) < (width - 4), "Title is too long for card"
+    DOUBLE_MARGIN = 4 # So a horizontal margin of n --> n*2
+    MARGIN = " " * (DOUBLE_MARGIN // 2)
+    assert len(title) < (width - DOUBLE_MARGIN - 2), "Title is too long for card"
     assert width % 2 == 0, "Width must be divisible by two"
     def split_text_into_lines(text):
         words = text.split(' ')
@@ -178,7 +180,7 @@ def print_card(title, text, width=40):
         line = ""
         i = 0
         while i < len(words):
-            if len(line) + len(words[i]) + 1 <= width - 4:
+            if len(line) + len(words[i]) + 1 <= width - DOUBLE_MARGIN - 2: # +1 for space, -2 for border
                 line += words[i] + " "
                 i += 1
             else:
@@ -190,10 +192,11 @@ def print_card(title, text, width=40):
 
     click.echo("+" + ("-" * (width - 2)) + "+")
     title = title if len(title) % 2 == 0 else title + " "
-    title_margin = " " * ((width - 4 - len(title)) // 2)
-    click.echo("| " + title_margin + title + title_margin + " |")
-    click.echo("| " + " " * (width - 4) + " |")
+    title_margin = " " * ((width - 2 - len(title)) // 2)
+    click.echo("|" + title_margin + title + title_margin + "|")
+    click.echo("|" + " " * (width - 2) + "|")
 
     for line in lines:
-        click.echo("| " + line + (' ' * (width - len(line) - 4)) + " |")
+        click.echo("|" + MARGIN + line + (' ' * (width - len(line) - DOUBLE_MARGIN - 2)) + MARGIN + "|")
+    click.echo("|" + " " * (width - 2) + "|")
     click.echo("+" + ("-" * (width - 2)) + "+")
