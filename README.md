@@ -1,5 +1,3 @@
-# elephant
-
 ```
  __
 '. \
@@ -32,6 +30,10 @@ Should be compatible with Python 2 & 3 on MacOS, Linux, and Windows! The only 3r
 $ git clone https://github.com/ejmichaud/elephant.git
 $ cd elephant
 $ pip install .
+```
+Lastly, initialize the database by executing the `init_db.sh` script:
+```
+. init_db.sh
 ```
 
 ## Tutorial
