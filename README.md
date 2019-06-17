@@ -31,10 +31,7 @@ $ git clone https://github.com/ejmichaud/elephant.git
 $ cd elephant
 $ pip install .
 ```
-Lastly, initialize the database by executing the `db_init.sh` script:
-```
-. db_init.sh
-```
+If you somehow compromise the application's sqlite3 database, you can reset it by running `. db_init.sh` from the repo root directory. This will delete the current `data.db` file, create a new one, and add `cards` and `metadata` tables. 
 
 ## Tutorial
 ```
@@ -47,11 +44,11 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  add     Create a card Examples: $ elephant add "A...
+  add     Create a card
   ls      List some cards
-  quiz    Review cards you are at risk of forgetting
+  quiz    Review cards that you are at risk of...
   rm      Remove cards with listed ids
-  search  Print cards containing phrase (case...
+  search  Print cards whose question or answer combined...
 ```
 
 ### To add a card:
@@ -65,30 +62,35 @@ As you can see, the system is quite flexible to different ways of formatting tex
 ### To view cards (and their ids):
 ```
 $ elephant ls
-0. Your question? --> Your answer
-1. another question --> answer
-2. QUESTION --> 42
+#0: Your question --> Your answer.
+#1: another question --> answer
+#2: QUESTION --> 42
+
 $ elephant ls --limit 1
-0. Your question? --> Your answer
+#0: Your question --> Your answer.
 ```
 
 ### To search your card deck:
 ```
 $ elephant search 42
-2. QUESTION --> 42
+#2: QUESTION --> 42
+
 $ elephant search question
-0. Your question? --> Your answer
-1. another question --> answer
+#0: Your question --> Your answer.
+#1: another question --> answer
+#2: QUESTION --> 42
+
 $ elephant search --limit 1 question
-0. Your question? --> Your answer
+#0: Your question --> Your answer.
 ```
 
 ### To remove a card:
 ```
 $ elephant rm 0 1
-Removed 2 cards
+Removed cards: [0, 1]
+
 $ elephant ls
-2. QUESTION --> 42
+#2: QUESTION --> 42
 ```
 `elephant rm` takes an arbitrary number of card ids as arguments and removes them.
 
@@ -96,15 +98,20 @@ $ elephant ls
 ```
 $ elephant quiz
 Starting review session... Spam Ctrl-C to stop
-
-QUESTION : QUESTION 
-
++--------------------------------------+
+|               QUESTION               |
+|                                      |
+|  QUESTION                            |
+|                                      |
++--------------------------------------+
 (Press any key to show answer)
 
-...
-
-ANSWER : 42 
-
++--------------------------------------+
+|                ANSWER                |
+|                                      |
+|  42                                  |
+|                                      |
++--------------------------------------+
 Did you remember it? yes/meh/no [yes]: 
 
 ...
