@@ -31,9 +31,9 @@ $ git clone https://github.com/ejmichaud/elephant.git
 $ cd elephant
 $ pip install .
 ```
-Lastly, initialize the database by executing the `init_db.sh` script:
+Lastly, initialize the database by executing the `db_init.sh` script:
 ```
-. init_db.sh
+. db_init.sh
 ```
 
 ## Tutorial
