@@ -5,7 +5,7 @@ import time
 import click
 import sqlite3
 
-DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data.db')
+DATABASE = os.path.join(os.path.dirname(os.path.realpath('__file__')), 'data.db')
 # METADATA_DATABASE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'metadata.p')
 
 LEVELS_TO_INTERVALS = {
